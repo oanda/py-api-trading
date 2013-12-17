@@ -17,8 +17,9 @@ def checkAndTrade():
             headers = {"Content-Type" : "application/x-www-form-urlencoded"}
             params = urllib.urlencode({"instrument" : "USD_CAD",
                                        "units" : 50,
+                                       "type" : 'market',
                                        "side" : "buy"})
-            conn.request("POST", "/v1/accounts/8026346/trades", params, headers)
+            conn.request("POST", "/v1/accounts/8026346/orders", params, headers)
             print conn.getresponse().read()
     else:
         print resptext
@@ -40,3 +41,4 @@ def order():
     print conn.getresponse().read()
 
 order()
+checkAndTrade()

@@ -3,7 +3,7 @@ import urllib
 import json
 import sys
 import time
-
+import datetime
 ## Input Required: period granularity instrument account
 
 ## This script will constantly check for new candle information and constantly calculate SMA and WMA.
@@ -34,23 +34,27 @@ def SMA(period, granularity, pair):
     url = ''.join(["/v1/history?count=", str(period + 1), "&instrument=", pair, "&granularity=", str(granularity), "&candleFormat=midpoint"])
     print url
     conn.request("GET", url)
-    print conn.getresponse().read()
-    candles = json.loads(conn.getresponse().read())['candles']
+    response = conn.getresponse().read()
+    candles = json.loads(response)['candles']
     candlewidth = getGranularitySeconds(granularity)
     now = time.time()
     finalsma = 0
     count = 0
     oldest = now - (period * candlewidth)
+    oldprice = 0
     for candle in candles:
-        if candle['time'] < oldest:
+        candleTime = time.mktime(time.strptime(str(candle['time']),  '%Y-%m-%dT%H:%M:%SZ'))
+        if candleTime < oldest:
             oldprice = candle['closeMid']
             continue
         else:
-            while oldest < candle['time']:
+            while oldest < candleTime:
+                #print oldest
                 finalsma += oldprice
                 count += 1
                 oldest += candlewidth
             oldprice = candle['closeMid']
+        
     while oldest < now:
         finalsma += candles[-1]['closeMid']
         count += 1
@@ -71,12 +75,14 @@ def WMA(period, granularity, pair):
     finalsma = 0
     count = 0
     oldest = now - (period * candlewidth)
+    oldprice = 0
     for candle in candles:
-        if candle['time'] < oldest:
+        candleTime = time.mktime(time.strptime(str(candle['time']),  '%Y-%m-%dT%H:%M:%SZ'))
+        if candleTime < oldest:
             oldprice = candle['closeMid']
             continue
         else:
-            while oldest < candle['time']:
+            while oldest < candleTime:
                 count += 1
                 finalsma += oldprice * count
                 oldest += candlewidth
@@ -103,7 +109,7 @@ def compareAndTrade(period, granularity, pair, account):
             if SMA(period, granularity, pair) > WMA(period, granularity, pair):
                 state = 'falling'
                 conn = httplib.HTTPConnection("api-sandbox.oanda.com")
-                url = ''.join(["/v1/accounts/", account, "/trades?units=50&direction=short&instrument=", pair])
+                url = ''.join(["/v1/accounts/", account, "/orders?type=market&units=50&side=sell&instrument=", pair])
                 print url
                 try:
                     conn.request("POST", url)
@@ -113,7 +119,7 @@ def compareAndTrade(period, granularity, pair, account):
             if SMA(period, granularity, pair) < WMA(period, granularity, pair):
                 state = 'rising'
                 conn = httplib.HTTPConnection("api-sandbox.oanda.com")
-                url = ''.join(["/v1/accounts/", account, "/trades?units=50&direction=long&instrument=", pair])
+                url = ''.join(["/v1/accounts/", account, "/trades?type=market&units=50&side=buy&instrument=", pair])
                 print url
                 try:
                     conn.request("POST", url)
