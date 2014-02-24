@@ -15,7 +15,7 @@ import datetime
 def getGranularitySeconds(granularity):
     if granularity[0] == 'S':
         return int(granularity[1:])
-    elif granularity[0] == 'M':
+    elif granularity[0] == 'M' and len(granularity) > 1:
         return 60*int(granularity[1:])
     elif granularity[0] == 'H':
         return 60*60*int(granularity[1:])
@@ -23,7 +23,7 @@ def getGranularitySeconds(granularity):
         return 60*60*24
     elif granularity[0] == 'W':
         return 60*60*24*7
-    #Monthly does not actually calculate as it should
+    #Does not take into account actual month length
     elif granularity[0] == 'M':
         return 60*60*24*30
 
