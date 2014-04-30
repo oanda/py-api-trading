@@ -8,7 +8,7 @@ import datetime
 ## This demonstrates getting the current price of an instrument and trading if it is above a threshold
 def checkAndTrade():
     conn = httplib.HTTPSConnection("api-sandbox.oanda.com")
-    conn.request("GET", "/v1/quote?instruments=USD_CAD")
+    conn.request("GET", "/v1/prices?instruments=USD_CAD")
     response = conn.getresponse()
     resptext = response.read()
     if response.status == 200:
