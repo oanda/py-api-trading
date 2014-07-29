@@ -12,6 +12,8 @@ import datetime
 
 ## Parses a granularity like S10 or M15 into the corresponding number of seconds
 ## Does not take into account anything weird, leap years, DST, etc.
+is_dst = time.daylight and time.localtime().tm_isdst > 0
+utc_offset = (time.altzone if is_dst else time.timezone)
 def getGranularitySeconds(granularity):
     if granularity[0] == 'S':
         return int(granularity[1:])
@@ -37,19 +39,18 @@ def SMA(period, granularity, pair):
     response = conn.getresponse().read()
     candles = json.loads(response)['candles']
     candlewidth = getGranularitySeconds(granularity)
-    now = time.time()
+    now = time.time() + utc_offset
     finalsma = 0
     count = 0
     oldest = now - (period * candlewidth)
     oldprice = 0
     for candle in candles:
-        candleTime = time.mktime(time.strptime(str(candle['time']),  '%Y-%m-%dT%H:%M:%SZ'))
+        candleTime = time.mktime(time.strptime(str(candle['time']),  '%Y-%m-%dT%H:%M:%S.%fZ'))
         if candleTime < oldest:
             oldprice = candle['closeMid']
             continue
         else:
             while oldest < candleTime:
-                #print oldest
                 finalsma += oldprice
                 count += 1
                 oldest += candlewidth
@@ -71,13 +72,13 @@ def WMA(period, granularity, pair):
     resp = json.loads(conn.getresponse().read())
     candles = resp['candles']
     candlewidth = getGranularitySeconds(granularity)
-    now = time.time()
+    now = time.time() + utc_offset
     finalsma = 0
     count = 0
     oldest = now - (period * candlewidth)
     oldprice = 0
     for candle in candles:
-        candleTime = time.mktime(time.strptime(str(candle['time']),  '%Y-%m-%dT%H:%M:%SZ'))
+        candleTime = time.mktime(time.strptime(str(candle['time']),  '%Y-%m-%dT%H:%M:%S.%fZ'))
         if candleTime < oldest:
             oldprice = candle['closeMid']
             continue
@@ -109,23 +110,33 @@ def compareAndTrade(period, granularity, pair, account):
             if SMA(period, granularity, pair) > WMA(period, granularity, pair):
                 state = 'falling'
                 conn = httplib.HTTPConnection("api-sandbox.oanda.com")
-                url = ''.join(["/v1/accounts/", account, "/orders?type=market&units=50&side=sell&instrument=", pair])
+                params = urllib.urlencode({"instrument": pair,
+                                           "units" : 200,
+                                           "side" : "sell",
+                                           "type" : "market"})
+                url = ''.join(["/v1/accounts/", account, "/orders"])
+                headers = {"Content-Type" : "application/x-www-form-urlencoded"}
                 print url
                 try:
-                    conn.request("POST", url)
+                    conn.request("POST", url, params, headers)
                     print conn.getresponse().read()
                 except: pass
         elif state == 'falling':
             if SMA(period, granularity, pair) < WMA(period, granularity, pair):
                 state = 'rising'
                 conn = httplib.HTTPConnection("api-sandbox.oanda.com")
-                url = ''.join(["/v1/accounts/", account, "/trades?type=market&units=50&side=buy&instrument=", pair])
+                params = urllib.urlencode({"instrument": pair,
+                                           "units" : 200,
+                                           "side" : "buy",
+                                           "type" : "market"})
+                url = ''.join(["/v1/accounts/", account, "/orders"])
+                headers = {"Content-Type" : "application/x-www-form-urlencoded"}
                 print url
                 try:
-                    conn.request("POST", url)
+                    conn.request("POST", url, params, headers)
                     print conn.getresponse().read()
                 except: pass
-        time.sleep(period - 1)
+        time.sleep(getGranularitySeconds(granularity))
 
 
 if __name__ == "__main__":
